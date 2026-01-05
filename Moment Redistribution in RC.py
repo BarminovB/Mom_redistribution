@@ -141,4 +141,3 @@ else:
     Note on Diagram Convention: Positive moments (sagging) are plotted below the axis, negative (hogging) above, to visually match beam curvature.
     Hover over the lines to see exact values at any position.
     """)
-```atter(x
