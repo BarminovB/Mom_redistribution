@@ -55,8 +55,8 @@ def main():
     m_rd_points = []
 
     for x in x_points:
-        span = int(x // L)
-        x_loc = x % L
+        span = min(int(x // L), n - 1)
+        x_loc = x - span * L
         m_el = M_supports_el[span] * (1 - x_loc / L) + M_supports_el[span + 1] * (x_loc / L) + q * x_loc * (L - x_loc) / 2
         m_el_points.append(m_el)
         m_rd = M_supports_rd[span] * (1 - x_loc / L) + M_supports_rd[span + 1] * (x_loc / L) + q * x_loc * (L - x_loc) / 2
