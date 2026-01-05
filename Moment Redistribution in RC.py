@@ -1,6 +1,7 @@
 import streamlit as st
 import numpy as np
-import matplotlib.pyplot as plt
+import plotly.graph_objects as go
+from plotly.subplots import make_subplots
 
 st.title("Beam Moment Redistribution Calculator")
 
@@ -75,45 +76,49 @@ else:
         m_rd_points.append(m_rd)
         m_delta_points.append(m_delta)
 
-    # Plotting: Positive moment (sagging, tension bottom), negative (hogging, tension top)
-    # Plot as is, without flipping, but adjust for convention if needed. Here, positive down for sagging.
-    fig, axs = plt.subplots(3, 1, sharex=True, figsize=(12, 8), gridspec_kw={'height_ratios': [1, 1, 1]})
+    # For plotting: Invert signs to match convention - positive (sagging) below zero, negative (hogging) above zero
+    m_el_plot = [-m for m in m_el_points]  # Now positive original -> negative plot (below)
+    m_rd_plot = [-m for m in m_rd_points]
+    m_delta_plot = [-m for m in m_delta_points]  # Consistent inversion
+
+    # Create subplots with Plotly for interactivity (hover)
+    fig = make_subplots(rows=3, cols=1, shared_xaxes=True, vertical_spacing=0.1,
+                        subplot_titles=('Elastic Moment Diagram', 'Redistributing Moment Diagram (Difference)', 'Redistributed Moment Diagram'))
 
     # Elastic moment
-    axs[0].plot(x_points, m_el_points, label='Elastic Moment', color='blue')
-    axs[0].fill_between(x_points, m_el_points, 0, where=(np.array(m_el_points) > 0), facecolor='blue', alpha=0.3)
-    axs[0].fill_between(x_points, m_el_points, 0, where=(np.array(m_el_points) < 0), facecolor='red', alpha=0.3)
-    axs[0].set_title('Elastic Moment Diagram')
-    axs[0].set_ylabel('Moment (kNm)')
-    axs[0].grid(True)
-    axs[0].legend()
+    fig.add_trace(go.Scatter(x=x_points, y=m_el_plot, mode='lines', name='Elastic Moment',
+                             hovertemplate='Position: %{x:.2f} m<br>Moment: %{customdata:.2f} kNm',
+                             customdata=[-y for y in m_el_plot],  # Show original sign on hover
+                             line=dict(color='blue')), row=1, col=1)
+    fig.add_trace(go.Scatter(x=x_points, y=np.zeros_like(x_points), mode='lines', line=dict(color='black', width=1), showlegend=False), row=1, col=1)
 
-    # Redistributing moment (difference, linear in each span)
-    axs[1].plot(x_points, m_delta_points, label='Redistributing Moment (Difference)', color='green')
-    axs[1].fill_between(x_points, m_delta_points, 0, where=(np.array(m_delta_points) > 0), facecolor='green', alpha=0.3)
-    axs[1].fill_between(x_points, m_delta_points, 0, where=(np.array(m_delta_points) < 0), facecolor='orange', alpha=0.3)
-    axs[1].set_title('Redistributing Moment Diagram (Linear Difference)')
-    axs[1].set_ylabel('Δ Moment (kNm)')
-    axs[1].grid(True)
-    axs[1].legend()
+    # Redistributing moment
+    fig.add_trace(go.Scatter(x=x_points, y=m_delta_plot, mode='lines', name='Redistributing Moment',
+                             hovertemplate='Position: %{x:.2f} m<br>Δ Moment: %{customdata:.2f} kNm',
+                             customdata=[-y for y in m_delta_plot],
+                             line=dict(color='green')), row=2, col=1)
+    fig.add_trace(go.Scatter(x=x_points, y=np.zeros_like(x_points), mode='lines', line=dict(color='black', width=1), showlegend=False), row=2, col=1)
 
     # Redistributed moment
-    axs[2].plot(x_points, m_rd_points, label='Redistributed Moment', color='purple')
-    axs[2].fill_between(x_points, m_rd_points, 0, where=(np.array(m_rd_points) > 0), facecolor='purple', alpha=0.3)
-    axs[2].fill_between(x_points, m_rd_points, 0, where=(np.array(m_rd_points) < 0), facecolor='pink', alpha=0.3)
-    axs[2].set_title('Redistributed Moment Diagram')
-    axs[2].set_xlabel('Position along the beam (m)')
-    axs[2].set_ylabel('Moment (kNm)')
-    axs[2].grid(True)
-    axs[2].legend()
+    fig.add_trace(go.Scatter(x=x_points, y=m_rd_plot, mode='lines', name='Redistributed Moment',
+                             hovertemplate='Position: %{x:.2f} m<br>Moment: %{customdata:.2f} kNm',
+                             customdata=[-y for y in m_rd_plot],
+                             line=dict(color='purple')), row=3, col=1)
+    fig.add_trace(go.Scatter(x=x_points, y=np.zeros_like(x_points), mode='lines', line=dict(color='black', width=1), showlegend=False), row=3, col=1)
 
     # Add vertical lines for supports
-    for ax in axs:
-        for i in range(1, n):
-            ax.axvline(x=i * L, color='gray', linestyle='--', linewidth=1)
+    for i in range(1, n):
+        fig.add_vline(x=i * L, line=dict(color='gray', dash='dash', width=1), row='all', col=1)
 
-    plt.tight_layout()
-    st.pyplot(fig)
+    # Update layout
+    fig.update_layout(height=800, width=1000, showlegend=True,
+                      xaxis3_title='Position along the beam (m)',
+                      yaxis_title='Moment (kNm, inverted sign for convention)',
+                      yaxis2_title='Δ Moment (kNm, inverted)',
+                      yaxis3_title='Moment (kNm, inverted)')
+    fig.update_yaxes(autorange=True)  # Allow auto-scaling
+
+    st.plotly_chart(fig, use_container_width=True)
 
     # Theory section
     st.subheader("Theory of Moment Redistribution")
@@ -132,4 +137,8 @@ else:
     The calculation uses the elastic moments from structural analysis (matrix method for continuous beams) and applies δ to internal 
     support moments. The field moments adjust accordingly to maintain equilibrium. Signs: Positive for sagging (tension in bottom fibers), 
     negative for hogging (tension in top fibers).
+
+    Note on Diagram Convention: Positive moments (sagging) are plotted below the axis, negative (hogging) above, to visually match beam curvature.
+    Hover over the lines to see exact values at any position.
     """)
+```atter(x
