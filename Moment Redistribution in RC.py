@@ -1,5 +1,6 @@
 import numpy as np
 import matplotlib.pyplot as plt
+import streamlit
 
 def main():
     n_spans = int(input("Enter number of spans: "))
@@ -70,4 +71,5 @@ def main():
     plt.show()
 
 if __name__ == "__main__":
+
     main()
