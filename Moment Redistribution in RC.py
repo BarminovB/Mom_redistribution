@@ -1,6 +1,7 @@
 import streamlit as st
 import numpy as np
-import matplotlib.pyplot as plt
+import plotly.graph_objects as go
+import string
 
 def main():
     st.title("Beam Moment Redistribution Calculator")
@@ -29,9 +30,6 @@ def main():
     M_internal = np.linalg.solve(A, b)
     M_supports_el = [0.0] + list(M_internal) + [0.0]
     M_supports_rd = [0.0] + [delta * m for m in M_internal] + [0.0]
-
-    st.write("Elastic support moments (kNm):", [round(m, 2) for m in M_supports_el])
-    st.write("Redistributed support moments (kNm):", [round(m, 2) for m in M_supports_rd])
 
     for span in range(n):
         def m_el(x_loc):
@@ -62,15 +60,59 @@ def main():
         m_rd = M_supports_rd[span] * (1 - x_loc / L) + M_supports_rd[span + 1] * (x_loc / L) + q * x_loc * (L - x_loc) / 2
         m_rd_points.append(m_rd)
 
-    fig, ax = plt.subplots(figsize=(12, 6))
-    ax.plot(x_points, m_el_points, label='Elastic moment')
-    ax.plot(x_points, m_rd_points, label='Moment after redistribution')
-    ax.set_xlabel('Position along the beam (m)')
-    ax.set_ylabel('Bending moment (kNm)')
-    ax.set_title('Bending moment diagrams before and after redistribution')
-    ax.legend()
-    ax.grid(True)
-    st.pyplot(fig)
+    # Flip signs for plotting (support up, span down)
+    m_el_plot = [-m for m in m_el_points]
+    m_rd_plot = [-m for m in m_rd_points]
+
+    fig = go.Figure()
+
+    # Add elastic moment trace with hover
+    fig.add_trace(go.Scatter(
+        x=x_points, 
+        y=m_el_plot, 
+        name='Elastic moment',
+        customdata=list(zip(m_el_points, x_points)),
+        hovertemplate='x: %{customdata[1]:.2f} m<br>M_elastic: %{customdata[0]:.2f} kNm'
+    ))
+
+    # Add redistributed moment trace with hover
+    fig.add_trace(go.Scatter(
+        x=x_points, 
+        y=m_rd_plot, 
+        name='Moment after redistribution',
+        customdata=list(zip(m_rd_points, x_points)),
+        hovertemplate='x: %{customdata[1]:.2f} m<br>M_redist: %{customdata[0]:.2f} kNm'
+    ))
+
+    # Draw the beam
+    max_plot = max(max(m_el_plot), max(m_rd_plot))
+    beam_y = max_plot + 20  # Place beam above the moment diagram
+    fig.add_shape(type="line",
+                  x0=0, y0=beam_y, x1=total_length, y1=beam_y,
+                  line=dict(color="black", width=4))
+
+    # Draw supports (hinges as triangles or simple markers)
+    support_names = list(string.ascii_uppercase[:n+1])
+    for i in range(n+1):
+        x_sup = i * L
+        # Simple hinge symbol: circle below the beam
+        fig.add_shape(type="circle",
+                      xref="x", yref="y",
+                      x0=x_sup - 0.2, y0=beam_y - 5, x1=x_sup + 0.2, y1=beam_y - 3,
+                      line_color="black", fillcolor="white")
+        # Support name
+        fig.add_annotation(x=x_sup, y=beam_y - 10, text=support_names[i], showarrow=False)
+
+    fig.update_layout(
+        xaxis_title='Position along the beam (m)',
+        yaxis_title='Bending moment (kNm) (hogging positive up, sagging negative down)',
+        title='Bending moment diagrams before and after redistribution',
+        hovermode='x unified',  # Show hover for both traces at same x
+        showlegend=True,
+        height=600
+    )
+
+    st.plotly_chart(fig)
 
 if __name__ == "__main__":
     main()
